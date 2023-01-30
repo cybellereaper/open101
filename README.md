@@ -7,4 +7,4 @@ The only reason. Why, these files to exist to teach others and nothing else.
 
 Open101 has been abandoned since Oct, 23 2019
 
-[WTFPL V2, Free Software License.]()
+[WTFPL V2, Free Software License.](https://github.com/Alicyclic/wiz101server/blob/main/LICENSE.md)
