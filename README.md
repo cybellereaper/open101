@@ -1,10 +1,4 @@
-### Open101 Archives
-
-These files have been researched upon and tampered with overtime.
-They're considered inaccurate and in an unusable state.
-
-The only reason. Why, these files to exist to teach others and nothing else.
-
-Open101 has been abandoned since Oct, 23 2019
-
+### The Archives of Open101
+These files have been studied and altered over time. They are deemed incorrect and useless.
+Open101 has been decommissioned since October 23, 2019.
 [WTFPL V2, Free Software License.](https://github.com/Alicyclic/wiz101server/blob/main/LICENSE.md)
