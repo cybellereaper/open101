@@ -1,6 +1,5 @@
-### The Archives of Open101
-These files have been studied and altered over time. They are deemed incorrect and useless.
+### Open101
+These files have been studied and altered over time. They are deemed incorrect and ineffective.
+The project has been decommissioned since October 23, 2019.
 
-Open101 has been decommissioned since October 23, 2019.
-
-[WTFPL V2, Free Software License.](https://github.com/Alicyclic/wiz101server/blob/main/LICENSE.md)
+[This project is licensed under the WTFPL V2, Free Software License.](https://github.com/Alicyclic/wiz101server/blob/main/LICENSE.md)
