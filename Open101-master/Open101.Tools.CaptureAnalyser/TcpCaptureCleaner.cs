@@ -5,10 +5,6 @@ using PacketDotNet;
 
 namespace Open101.Tools.CaptureAnalyser
 {
-    /*
-     *  FROM https://github.com/Bochozkar/tera-watcher
-     */
-    
     public class PriorityQueue<T>
     {
         private readonly SortedList<uint, T> _list;
@@ -42,11 +38,11 @@ namespace Open101.Tools.CaptureAnalyser
             return _list[_list.Keys[0]];
         }
     }
-    
+
     public class TcpCaptureCleaner
     {
-        private uint m_seqN;
-        private PriorityQueue<TcpPacket> m_tcpBuffer;
+        private uint currentSequenceNumber;
+        private PriorityQueue<TcpPacket> tcpPacketBuffer;
         public LoggingKIPacketHandler m_handler;
 
         public TcpCaptureCleaner()
@@ -56,8 +52,8 @@ namespace Open101.Tools.CaptureAnalyser
 
         private void Reset()
         {
-            m_seqN = 0;
-            m_tcpBuffer = new PriorityQueue<TcpPacket>();
+            currentSequenceNumber = 0;
+            tcpPacketBuffer = new PriorityQueue<TcpPacket>();
         }
 
         public bool ProcessPacket(TcpPacket tcpPacket)
@@ -65,75 +61,76 @@ namespace Open101.Tools.CaptureAnalyser
             var data = tcpPacket.PayloadData;
             var length = data.Length;
 
-            // handle TCP SYN (connection started)
+            // Handle TCP SYN (connection started)
             if (tcpPacket.Synchronize)
             {
-                m_seqN = tcpPacket.SequenceNumber + 1;
+                currentSequenceNumber = tcpPacket.SequenceNumber + 1;
                 return true;
             }
 
-            // handle TCP FIN (connection terminated)
+            // Handle TCP FIN (connection terminated)
             if (tcpPacket.Finished)
             {
                 Console.WriteLine("<connection terminated>");
-                //Reset();
+                // Reset();
                 return false;
             }
 
-            // early exit if no data
+            // Early exit if no data
             if (length == 0) return true;
 
             while (tcpPacket != null)
             {
-                if (tcpPacket.SequenceNumber > m_seqN)
+                if (tcpPacket.SequenceNumber > currentSequenceNumber)
                 {
                     Console.WriteLine("out-of-order packet {0} (expected {1}) :: queue -> {2}",
-                        tcpPacket.SequenceNumber, m_seqN, m_tcpBuffer.Count + 1);
-                    m_tcpBuffer.Enqueue(tcpPacket, tcpPacket.SequenceNumber);
+                        tcpPacket.SequenceNumber, currentSequenceNumber, tcpPacketBuffer.Count + 1);
+                    tcpPacketBuffer.Enqueue(tcpPacket, tcpPacket.SequenceNumber);
                     return true;
                 }
 
                 data = tcpPacket.PayloadData;
                 length = data.Length;
 
-                // check for old seq
-                int rewind = (int) (m_seqN - tcpPacket.SequenceNumber);
+                // Check for old sequence number
+                int rewind = (int)(currentSequenceNumber - tcpPacket.SequenceNumber);
                 if (rewind > 0)
                 {
-                    // seq in past?
+                    // Sequence in the past?
                     if (length - rewind <= 0)
                     {
-                        // no additional data?
+                        // No additional data?
                         Console.Write("duplicate packet {0}, dropping :: queue -> {1}", tcpPacket.SequenceNumber,
-                            m_tcpBuffer.Count);
-                        if (m_tcpBuffer.Count > 0) Console.Write(", next = {0}", m_tcpBuffer.Peek().SequenceNumber);
+                            tcpPacketBuffer.Count);
+                        if (tcpPacketBuffer.Count > 0) Console.Write(", next = {0}", tcpPacketBuffer.Peek().SequenceNumber);
                         Console.WriteLine();
 
-                        tcpPacket = (m_tcpBuffer.Count > 0) ? m_tcpBuffer.Dequeue() : null;
+                        tcpPacket = (tcpPacketBuffer.Count > 0) ? tcpPacketBuffer.Dequeue() : null;
                         continue;
                     }
 
-                    // catch up
+                    // Catch up
                     length -= rewind;
-                    Console.Write("catching up, +{0} bytes :: queue -> {1}", length, m_tcpBuffer.Count);
-                    if (m_tcpBuffer.Count > 0) Console.Write(", next = {0}", m_tcpBuffer.Peek().SequenceNumber);
+                    Console.Write("catching up, +{0} bytes :: queue -> {1}", length, tcpPacketBuffer.Count);
+                    if (tcpPacketBuffer.Count > 0) Console.Write(", next = {0}", tcpPacketBuffer.Peek().SequenceNumber);
                     Console.WriteLine();
 
                     Array.Copy(data, rewind, data, 0, length);
                     Array.Resize(ref data, length);
                 }
 
-                // advance expected sequence number
-                m_seqN += (uint) length;
+                // Advance expected sequence number
+                currentSequenceNumber += (uint)length;
 
-                // get next packet in queue
-                tcpPacket = (m_tcpBuffer.Count > 0) ? m_tcpBuffer.Dequeue() : null;
+                // Get the next packet in the queue
+                tcpPacket = (tcpPacketBuffer.Count > 0) ? tcpPacketBuffer.Dequeue() : null;
                 if (tcpPacket != null)
                 {
-                    Console.Write("fetching buffered packet :: queue -> {0}", m_tcpBuffer.Count);
-                    if (m_tcpBuffer.Count > 0) Console.Write(", next = {0}", m_tcpBuffer.Peek().SequenceNumber);
+                    Console.Write("fetching buffered packet :: queue -> {0}", tcpPacketBuffer.Count);
+                    if (tcpPacketBuffer.Count > 0) Console.Write(", next = {0}", tcpPacketBuffer.Peek().SequenceNumber);
                     Console.WriteLine();
                 }
+
                 ProcessData(data);
             }
 
