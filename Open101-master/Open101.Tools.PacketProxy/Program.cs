@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -8,83 +8,85 @@ using DragonLib.IO;
 
 namespace Open101.Tools.PacketProxy
 {
-	public static class Program
+    public static class Program
     {
-        //private static string s_actualLoginServer = "127.0.0.1";
-        //private static ushort s_actualLoginPort = 12001;
-        
-        private static string s_actualLoginServer = "26.25.98.202";
-        private static ushort s_actualLoginPort = 12000;
+        // Private fields for actual login server and ports
+        private static readonly string s_actualLoginServer = "26.25.98.202";
+        private static readonly ushort s_actualLoginPort = 12000;
 
-        //private static string s_actualLoginServer = "login.us.wizard101.com";
-        //private static ushort s_actualLoginPort = 12000;
+        // Public static fields
+        public static IPAddress ProxyIP { get; private set; }
+        public static IPEndPoint ActualLoginEndpoint { get; private set; }
+        private static IPEndPoint _loginProxy;
 
-        public static IPAddress s_proxyIP;
-        public static IPEndPoint s_actualLoginEndpoint;
-        private static IPEndPoint s_loginProxy;
+        private static readonly Dictionary<int, ProxyServer> _proxyServers = new Dictionary<int, ProxyServer>();
 
-        public static Dictionary<int, ProxyServer> s_proxyServers = new Dictionary<int, ProxyServer>();
-
-        private static void CreateLoginProxyAddr()
+        private static void CreateLoginProxyAddress()
         {
-            //string text7;
-            //using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.IP))
-            //{
-            //    socket.Connect("8.8.8.8", 65530);
-            //    text7 = ((IPEndPoint)socket.LocalEndPoint).Address.ToString();
-            //}
-            //s_proxyIP = IPAddress.Parse(text7);
-            s_proxyIP = IPAddress.Parse("192.168.0.77");
-            
-            //int port = new Random().Next(13000, 14000);
-            int port = 13000;
-            s_loginProxy = new IPEndPoint(s_proxyIP, port);
-            
-            Console.WriteLine($"s_loginProxy: {s_loginProxy}");
+            ProxyIP = IPAddress.Parse("192.168.0.77"); // Use IPAddress.TryParse to validate IP
+            int port = 13000; // new Random().Next(13000, 14000);
+            _loginProxy = new IPEndPoint(ProxyIP, port);
+            Console.WriteLine($"_loginProxy: {_loginProxy}");
         }
 
+        /// <summary>
+        /// Gets the proxy server associated with the specified port.
+        /// </summary>
+        /// <param name="port">The port number of the proxy server.</param>
+        /// <returns>The proxy server associated with the specified port.</returns>
         public static ProxyServer GetProxyServer(int port)
         {
-	        lock (s_proxyServers)
-	        {
-		        return s_proxyServers[port];
-	        }
+            lock (_proxyServers)
+            {
+                return _proxyServers.ContainsKey(port) ? _proxyServers[port] : null;
+            }
         }
 
-        public static ProxyServer AddProxyServer(IPEndPoint localAddress, string externalHostname, int externalPort, bool persistent=false)
+        /// <summary>
+        /// Adds a new proxy server with the given parameters to the list of proxy servers.
+        /// </summary>
+        /// <param name="localAddress">The local IP and port to bind the proxy server.</param>
+        /// <param name="externalHostname">The external hostname of the server to forward packets.</param>
+        /// <param name="externalPort">The external port of the server to forward packets.</param>
+        /// <param name="persistent">Indicates if the proxy server should be persistent.</param>
+        /// <returns>The newly created proxy server.</returns>
+        public static ProxyServer AddProxyServer(IPEndPoint localAddress, string externalHostname, int externalPort, bool persistent = false)
         {
-	        var server = new ProxyServer(localAddress, externalHostname, externalPort)
-	        {
-		        m_persistent = persistent
-	        };
-	        lock (s_proxyServers)
-	        {
-		        s_proxyServers[localAddress.Port] = server;
-	        }
-	        Logger.Success($"{localAddress}", "Proxy server created");
-	        return server;
+            var server = new ProxyServer(localAddress, externalHostname, externalPort)
+            {
+                Persistent = persistent
+            };
+
+            lock (_proxyServers)
+            {
+                _proxyServers[localAddress.Port] = server;
+            }
+
+            Logger.Success($"{localAddress}", "Proxy server created");
+            return server;
         }
 
         public static void Main(string[] args)
         {
-	        SerializerPlayground.Program.Init();
+            SerializerPlayground.Program.Init();
 
-	        s_actualLoginEndpoint = new IPEndPoint(Dns.GetHostAddresses(s_actualLoginServer).First(), s_actualLoginPort);
-            CreateLoginProxyAddr();
+            ActualLoginEndpoint = new IPEndPoint(Dns.GetHostAddresses(s_actualLoginServer).First(), s_actualLoginPort);
+            CreateLoginProxyAddress();
 
-            AddProxyServer(s_loginProxy, s_actualLoginServer, s_actualLoginPort, true);
+            AddProxyServer(_loginProxy, s_actualLoginServer, s_actualLoginPort, true);
 
             while (true)
             {
-	            Thread.Sleep(100);
-	            lock (s_proxyServers)
-	            {
-		            foreach (ProxyServer server in s_proxyServers.Values.ToArray())
-		            {
-			            server.Update();
-		            }
-		            if (s_proxyServers.Count == 0) break;
-	            }
+                Thread.Sleep(100);
+                lock (_proxyServers)
+                {
+                    foreach (ProxyServer server in _proxyServers.Values.ToArray())
+                    {
+                        server.Update();
+                    }
+
+                    if (_proxyServers.Count == 0) break;
+                }
             }
         }
     }
