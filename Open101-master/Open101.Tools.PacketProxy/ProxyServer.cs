@@ -9,7 +9,7 @@ namespace Open101.Tools.PacketProxy
     public class ProxyServer
     {
         private SocketManager<ForwardingConnectionOwner, AsyncTcpAcceptor> _server;
-        private DateTime? _timeoutTimer;
+        private DateTime _lastActivityTime;
 
         public ProxyServer(IPEndPoint localEndpoint, string externalHost, int externalPort)
         {
@@ -48,12 +48,12 @@ namespace Open101.Tools.PacketProxy
 
                 if (sockCount == 0)
                 {
-                    if (_timeoutTimer == null)
+                    if (_lastActivityTime == DateTime.MinValue)
                     {
-                        _timeoutTimer = DateTime.Now;
+                        _lastActivityTime = DateTime.Now;
                     }
 
-                    if (DateTime.Now - _timeoutTimer > TimeSpan.FromSeconds(30))
+                    if (DateTime.Now - _lastActivityTime > TimeSpan.FromSeconds(30))
                     {
                         Logger.Warn($"{LocalEndpoint}", "Proxy server closing due to timeout");
                         Stop();
@@ -61,7 +61,7 @@ namespace Open101.Tools.PacketProxy
                 }
                 else
                 {
-                    _timeoutTimer = null;
+                    _lastActivityTime = DateTime.MinValue;
                 }
             }
         }
@@ -73,9 +73,9 @@ namespace Open101.Tools.PacketProxy
         {
             _server.Stop();
 
-            lock (Program.s_proxyServers)
+            lock (Program.ProxyServers)
             {
-                Program.s_proxyServers.Remove(LocalEndpoint.Port);
+                Program.ProxyServers.Remove(LocalEndpoint.Port);
             }
         }
     }
