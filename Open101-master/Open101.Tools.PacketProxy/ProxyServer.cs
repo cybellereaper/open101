@@ -8,64 +8,74 @@ namespace Open101.Tools.PacketProxy
 {
     public class ProxyServer
     {
-        public SocketManager<ForwardingConnectionOwner, AsyncTcpAcceptor> m_server;
-        
-        public readonly string m_hostname;
-        public readonly int m_hostPost;
-        
-        public readonly IPEndPoint m_localEndpoint;
-        public readonly IPEndPoint m_externalEndpoint;
+        private SocketManager<ForwardingConnectionOwner, AsyncTcpAcceptor> _server;
+        private DateTime? _timeoutTimer;
 
-        public DateTime? m_timeoutTimer;
-	    
-        public bool m_persistent;
-        public bool m_hasHadConnection;
-
-        public ProxyServer(IPEndPoint endPoint, string externalHost, int externalPort)
+        public ProxyServer(IPEndPoint localEndpoint, string externalHost, int externalPort)
         {
-            m_hostname = externalHost;
-            m_hostPost = externalPort;
-            var external = new IPEndPoint(Dns.GetHostAddresses(externalHost).First(), externalPort);
+            LocalEndpoint = localEndpoint;
+            ExternalEndpoint = new IPEndPoint(Dns.GetHostAddresses(externalHost).First(), externalPort);
 
-            m_localEndpoint = endPoint;
-            m_externalEndpoint = external;
+            _server = new SocketManager<ForwardingConnectionOwner, AsyncTcpAcceptor>();
+            _server.Start(localEndpoint.Address, (ushort)localEndpoint.Port);
 
-            m_server = new SocketManager<ForwardingConnectionOwner, AsyncTcpAcceptor>();
-            m_server.Start(endPoint.Address, (ushort)endPoint.Port);
+            HasHadConnection = false;
         }
 
+        public IPEndPoint LocalEndpoint { get; }
+        public IPEndPoint ExternalEndpoint { get; }
+
+        /// <summary>
+        /// Gets or sets whether the proxy server should be persistent.
+        /// </summary>
+        public bool Persistent { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether the proxy server has had a connection.
+        /// </summary>
+        public bool HasHadConnection { get; set; }
+
+        /// <summary>
+        /// Updates the proxy server.
+        /// </summary>
         public void Update()
         {
-            m_server.UpdateAll();
-            if (!m_persistent)
+            _server.UpdateAll();
+
+            if (!Persistent)
             {
-                var sockCount = m_server.GetSocketCount();
+                var sockCount = _server.GetSocketCount();
 
                 if (sockCount == 0)
                 {
-                    if (m_timeoutTimer == null)
+                    if (_timeoutTimer == null)
                     {
-                        m_timeoutTimer = DateTime.Now;
+                        _timeoutTimer = DateTime.Now;
                     }
 
-                    if (DateTime.Now - m_timeoutTimer > TimeSpan.FromSeconds(30))
+                    if (DateTime.Now - _timeoutTimer > TimeSpan.FromSeconds(30))
                     {
-                        Logger.Warn($"{m_localEndpoint}", "Proxy server closing due to timeout");
+                        Logger.Warn($"{LocalEndpoint}", "Proxy server closing due to timeout");
                         Stop();
                     }
-                } else
+                }
+                else
                 {
-                    m_timeoutTimer = null;
+                    _timeoutTimer = null;
                 }
             }
         }
 
+        /// <summary>
+        /// Stops the proxy server.
+        /// </summary>
         public void Stop()
         {
-            m_server.Stop();
+            _server.Stop();
+
             lock (Program.s_proxyServers)
             {
-                Program.s_proxyServers.Remove(m_localEndpoint.Port);
+                Program.s_proxyServers.Remove(LocalEndpoint.Port);
             }
         }
     }
